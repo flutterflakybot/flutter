@@ -848,7 +848,10 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
 
   AnimationController _cursorBlinkOpacityController;
 
-  final LayerLink _layerLink = LayerLink();
+  final LayerLink _toolbarLayerLink = LayerLink();
+
+  final List<LayerLink> _handleLayerLinks = <LayerLink>[LayerLink(), LayerLink()];
+
   bool _didAutoFocus = false;
   FocusAttachment _focusAttachment;
 
@@ -1224,9 +1227,11 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     if (widget.selectionControls != null) {
       _selectionOverlay = TextSelectionOverlay(
         context: context,
+        textDirection: _textDirection,
         value: _value,
         debugRequiredFor: widget,
-        layerLink: _layerLink,
+        toolbarLayerLink: _toolbarLayerLink,
+        handleLayerLinks : _handleLayerLinks,
         renderObject: renderObject,
         selectionControls: widget.selectionControls,
         selectionDelegate: this,
@@ -1541,13 +1546,14 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
       dragStartBehavior: widget.dragStartBehavior,
       viewportBuilder: (BuildContext context, ViewportOffset offset) {
         return CompositedTransformTarget(
-          link: _layerLink,
+          link: _toolbarLayerLink,
           child: Semantics(
             onCopy: _semanticsOnCopy(controls),
             onCut: _semanticsOnCut(controls),
             onPaste: _semanticsOnPaste(controls),
             child: _Editable(
               key: _editableKey,
+              handleLayerLinks: _handleLayerLinks,
               textSpan: buildTextSpan(),
               value: _value,
               cursorColor: _cursorColor,
@@ -1624,6 +1630,7 @@ class _Editable extends LeafRenderObjectWidget {
     Key key,
     this.textSpan,
     this.value,
+    this.handleLayerLinks,
     this.cursorColor,
     this.backgroundCursorColor,
     this.showCursor,
@@ -1657,6 +1664,7 @@ class _Editable extends LeafRenderObjectWidget {
   final TextSpan textSpan;
   final TextEditingValue value;
   final Color cursorColor;
+  final List<LayerLink> handleLayerLinks;
   final Color backgroundCursorColor;
   final ValueNotifier<bool> showCursor;
   final bool hasFocus;
@@ -1688,6 +1696,7 @@ class _Editable extends LeafRenderObjectWidget {
     return RenderEditable(
       text: textSpan,
       cursorColor: cursorColor,
+      handleLayerLinks: handleLayerLinks,
       backgroundCursorColor: backgroundCursorColor,
       showCursor: showCursor,
       hasFocus: hasFocus,
@@ -1721,6 +1730,7 @@ class _Editable extends LeafRenderObjectWidget {
     renderObject
       ..text = textSpan
       ..cursorColor = cursorColor
+      ..handleLayerLinks = handleLayerLinks
       ..showCursor = showCursor
       ..hasFocus = hasFocus
       ..maxLines = maxLines

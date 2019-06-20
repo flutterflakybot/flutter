@@ -11,6 +11,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import 'box.dart';
+import 'layer.dart';
 import 'object.dart';
 import 'viewport_offset.dart';
 
@@ -143,6 +144,7 @@ class RenderEditable extends RenderBox {
     Color backgroundCursorColor,
     ValueNotifier<bool> showCursor,
     bool hasFocus,
+    List<LayerLink> handleLayerLinks,
     int maxLines = 1,
     int minLines,
     bool expands = false,
@@ -168,6 +170,7 @@ class RenderEditable extends RenderBox {
        assert(textDirection != null, 'RenderEditable created without a textDirection.'),
        assert(maxLines == null || maxLines > 0),
        assert(minLines == null || minLines > 0),
+       assert(handleLayerLinks != null && handleLayerLinks.length == 2),
        assert(
          (maxLines == null) || (minLines == null) || (maxLines >= minLines),
          'minLines can\'t be greater than maxLines',
@@ -209,6 +212,7 @@ class RenderEditable extends RenderBox {
        _floatingCursorAddedMargin = floatingCursorAddedMargin,
        _enableInteractiveSelection = enableInteractiveSelection,
        _devicePixelRatio = devicePixelRatio,
+       _handleLayerLinks = handleLayerLinks,
        _obscureText = obscureText {
     assert(_showCursor != null);
     assert(!_showCursor.value || cursorColor != null);
@@ -900,6 +904,16 @@ class RenderEditable extends RenderBox {
     if (_cursorRadius == value)
       return;
     _cursorRadius = value;
+    markNeedsPaint();
+  }
+
+  /// the layer links of selection handles.
+  List<LayerLink> get handleLayerLinks => _handleLayerLinks;
+  List<LayerLink> _handleLayerLinks;
+  set handleLayerLinks(List<LayerLink> value) {
+    if (listEquals<LayerLink>(_handleLayerLinks, value))
+      return;
+    _handleLayerLinks = value;
     markNeedsPaint();
   }
 
@@ -1772,6 +1786,20 @@ class RenderEditable extends RenderBox {
       context.pushClipRect(needsCompositing, offset, Offset.zero & size, _paintContents);
     else
       _paintContents(context, offset);
+    final List<TextSelectionPoint> endpoints = getEndpointsForSelection(selection);
+
+    context.pushLayer(
+      LeaderLayer(link: handleLayerLinks[0], offset: endpoints[0].point),
+      super.paint,
+      Offset.zero
+    );
+    if (endpoints.length == 2) {
+      context.pushLayer(
+        LeaderLayer(link: handleLayerLinks[1], offset: endpoints[1].point),
+        super.paint,
+        Offset.zero
+      );
+    }
   }
 
   @override
