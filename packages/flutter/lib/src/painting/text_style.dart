@@ -1053,6 +1053,7 @@ class TextStyle extends Diagnosticable {
     TextDirection textDirection,
     double textScaleFactor = 1.0,
     String ellipsis,
+    TextWrap wrap,
     int maxLines,
     Locale locale,
     String fontFamily,
@@ -1086,6 +1087,7 @@ class TextStyle extends Diagnosticable {
       ),
       maxLines: maxLines,
       ellipsis: ellipsis,
+      wrap: wrap,
       locale: locale,
     );
   }

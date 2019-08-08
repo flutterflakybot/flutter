@@ -4967,12 +4967,16 @@ class RichText extends MultiChildRenderObjectWidget {
   ///
   /// The [textDirection], if null, defaults to the ambient [Directionality],
   /// which in that case must not be null.
+  ///
+  /// [softWrap] is deprecated, but it will precede [textWrap] if it is provided.
   RichText({
     Key key,
     @required this.text,
     this.textAlign = TextAlign.start,
     this.textDirection,
-    this.softWrap = true,
+    @Deprecated('Use textWrap instead')
+    this.softWrap,
+    this.textWrap = TextWrap.softWrap,
     this.overflow = TextOverflow.clip,
     this.textScaleFactor = 1.0,
     this.maxLines,
@@ -4981,7 +4985,7 @@ class RichText extends MultiChildRenderObjectWidget {
     this.textWidthBasis = TextWidthBasis.parent,
   }) : assert(text != null),
        assert(textAlign != null),
-       assert(softWrap != null),
+       assert(textWrap != null),
        assert(overflow != null),
        assert(textScaleFactor != null),
        assert(maxLines == null || maxLines > 0),
@@ -5022,6 +5026,11 @@ class RichText extends MultiChildRenderObjectWidget {
   /// Defaults to the ambient [Directionality], if any. If there is no ambient
   /// [Directionality], then this must not be null.
   final TextDirection textDirection;
+
+  /// How the overflow text should be wrapped.
+  ///
+  /// Defaults to [TextWrap.softWrap].
+  final TextWrap textWrap;
 
   /// Whether the text should break at soft line breaks.
   ///
@@ -5067,6 +5076,7 @@ class RichText extends MultiChildRenderObjectWidget {
       textAlign: textAlign,
       textDirection: textDirection ?? Directionality.of(context),
       softWrap: softWrap,
+      textWrap: textWrap,
       overflow: overflow,
       textScaleFactor: textScaleFactor,
       maxLines: maxLines,
@@ -5079,10 +5089,12 @@ class RichText extends MultiChildRenderObjectWidget {
   @override
   void updateRenderObject(BuildContext context, RenderParagraph renderObject) {
     assert(textDirection != null || debugCheckHasDirectionality(context));
+    // [softWrap] must be set after [textWrap].
     renderObject
       ..text = text
       ..textAlign = textAlign
       ..textDirection = textDirection ?? Directionality.of(context)
+      ..textWrap = textWrap
       ..softWrap = softWrap
       ..overflow = overflow
       ..textScaleFactor = textScaleFactor

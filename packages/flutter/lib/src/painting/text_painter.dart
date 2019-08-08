@@ -135,6 +135,7 @@ class TextPainter {
   /// The [maxLines] property, if non-null, must be greater than zero.
   TextPainter({
     InlineSpan text,
+    TextWrap wrap = TextWrap.softWrap,
     TextAlign textAlign = TextAlign.start,
     TextDirection textDirection,
     double textScaleFactor = 1.0,
@@ -145,6 +146,7 @@ class TextPainter {
     TextWidthBasis textWidthBasis = TextWidthBasis.parent,
   }) : assert(text == null || text.debugAssertIsValid()),
        assert(textAlign != null),
+       assert(wrap != null),
        assert(textScaleFactor != null),
        assert(maxLines == null || maxLines > 0),
        assert(textWidthBasis != null),
@@ -156,6 +158,7 @@ class TextPainter {
        _ellipsis = ellipsis,
        _locale = locale,
        _strutStyle = strutStyle,
+       _wrap = wrap,
        _textWidthBasis = textWidthBasis;
 
   ui.Paragraph _paragraph;
@@ -196,6 +199,22 @@ class TextPainter {
     if (_textAlign == value)
       return;
     _textAlign = value;
+    _paragraph = null;
+    _needsLayout = true;
+  }
+
+  /// How the overflow text should wrap around
+  ///
+  /// After this is set, you must call [layout] before the next call to [paint].
+  ///
+  /// The [wrap] property must not be null. It defaults to [TextWrap.softWrap].
+  TextWrap get wrap => _wrap;
+  TextWrap _wrap;
+  set wrap(TextWrap value) {
+    assert(value != null);
+    if (_wrap == value)
+      return;
+    _wrap = value;
     _paragraph = null;
     _needsLayout = true;
   }
@@ -396,6 +415,7 @@ class TextPainter {
       textScaleFactor: textScaleFactor,
       maxLines: _maxLines,
       ellipsis: _ellipsis,
+      wrap: wrap,
       locale: _locale,
       strutStyle: _strutStyle,
     ) ?? ui.ParagraphStyle(
@@ -403,6 +423,7 @@ class TextPainter {
       textDirection: textDirection ?? defaultTextDirection,
       maxLines: maxLines,
       ellipsis: ellipsis,
+      wrap: wrap,
       locale: locale,
     );
   }

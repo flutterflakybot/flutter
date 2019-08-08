@@ -65,10 +65,14 @@ class RenderParagraph extends RenderBox
   ///
   /// The [maxLines] property may be null (and indeed defaults to null), but if
   /// it is not null, it must be greater than zero.
+  ///
+  /// [softWrap] is deprecated, but it will precede [textWrap] if it is provided.
   RenderParagraph(InlineSpan text, {
     TextAlign textAlign = TextAlign.start,
     @required TextDirection textDirection,
-    bool softWrap = true,
+    @Deprecated('Use textWrap instead')
+    bool softWrap,
+    TextWrap textWrap = TextWrap.softWrap,
     TextOverflow overflow = TextOverflow.clip,
     double textScaleFactor = 1.0,
     int maxLines,
@@ -80,15 +84,16 @@ class RenderParagraph extends RenderBox
        assert(text.debugAssertIsValid()),
        assert(textAlign != null),
        assert(textDirection != null),
-       assert(softWrap != null),
        assert(overflow != null),
        assert(textScaleFactor != null),
        assert(maxLines == null || maxLines > 0),
        assert(textWidthBasis != null),
        _softWrap = softWrap,
        _overflow = overflow,
+       _textWrap = textWrap,
        _textPainter = TextPainter(
          text: text,
+         wrap: textWrap,
          textAlign: textAlign,
          textDirection: textDirection,
          textScaleFactor: textScaleFactor,
@@ -97,7 +102,11 @@ class RenderParagraph extends RenderBox
          locale: locale,
          strutStyle: strutStyle,
          textWidthBasis: textWidthBasis,
-       ) {
+       ){
+    if (softWrap != null) {
+      _textWrap = softWrap ? TextWrap.softWrap : TextWrap.none;
+      _textPainter.wrap = _textWrap;
+    }
     addAll(children);
     _extractPlaceholderSpans(text);
   }
@@ -182,15 +191,31 @@ class RenderParagraph extends RenderBox
   /// If false, the glyphs in the text will be positioned as if there was
   /// unlimited horizontal space.
   ///
-  /// If [softWrap] is false, [overflow] and [textAlign] may have unexpected
-  /// effects.
+  /// this property sets [textWrap] to [TextWrap.softWrap] if it is true,
+  /// [TextWrap.none] otherwise.
   bool get softWrap => _softWrap;
   bool _softWrap;
   set softWrap(bool value) {
-    assert(value != null);
     if (_softWrap == value)
       return;
     _softWrap = value;
+    if (_softWrap != null) {
+      textWrap = _softWrap ? TextWrap.softWrap : TextWrap.none;
+      markNeedsLayout();
+    }
+  }
+
+  /// How the overflow text should be wrapped.
+  ///
+  /// Defaults to [TextWrap.softWrap].
+  TextWrap get textWrap => _textWrap;
+  TextWrap _textWrap;
+  set textWrap(TextWrap value) {
+    assert(value != null);
+    if (_textWrap == value)
+      return;
+    _textWrap = value;
+    _textPainter.wrap = _textWrap;
     markNeedsLayout();
   }
 
@@ -457,8 +482,7 @@ class RenderParagraph extends RenderBox
   bool get debugHasOverflowShader => _overflowShader != null;
 
   void _layoutText({ double minWidth = 0.0, double maxWidth = double.infinity }) {
-    final bool widthMatters = softWrap || overflow == TextOverflow.ellipsis;
-    _textPainter.layout(minWidth: minWidth, maxWidth: widthMatters ? maxWidth : double.infinity);
+    _textPainter.layout(minWidth: minWidth, maxWidth: maxWidth);
   }
 
   void _layoutTextWithConstraints(BoxConstraints constraints) {

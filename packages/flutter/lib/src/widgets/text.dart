@@ -259,7 +259,9 @@ class Text extends StatelessWidget {
     this.textAlign,
     this.textDirection,
     this.locale,
+    @Deprecated('Use textWrap instead')
     this.softWrap,
+    this.textWrap = TextWrap.softWrap,
     this.overflow,
     this.textScaleFactor,
     this.maxLines,
@@ -290,7 +292,9 @@ class Text extends StatelessWidget {
     this.textAlign,
     this.textDirection,
     this.locale,
+    @Deprecated('Use textWrap instead')
     this.softWrap,
+    this.textWrap = TextWrap.softWrap,
     this.overflow,
     this.textScaleFactor,
     this.maxLines,
@@ -349,6 +353,11 @@ class Text extends StatelessWidget {
   ///
   /// See [RenderParagraph.locale] for more information.
   final Locale locale;
+
+  /// How the overflow text should be wrapped.
+  ///
+  /// Defaults to [TextWrap.softWrap].
+  final TextWrap textWrap;
 
   /// Whether the text should break at soft line breaks.
   ///
@@ -411,6 +420,7 @@ class Text extends StatelessWidget {
       textDirection: textDirection, // RichText uses Directionality.of to obtain a default if this is null.
       locale: locale, // RichText uses Localizations.localeOf to obtain a default if this is null
       softWrap: softWrap ?? defaultTextStyle.softWrap,
+      textWrap: textWrap,
       overflow: overflow ?? defaultTextStyle.overflow,
       textScaleFactor: textScaleFactor ?? MediaQuery.textScaleFactorOf(context),
       maxLines: maxLines ?? defaultTextStyle.maxLines,
