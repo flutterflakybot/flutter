@@ -4533,9 +4533,14 @@ class StatefulElement extends ComponentElement {
     properties.add(DiagnosticsProperty<State<StatefulWidget>>('state', state, defaultValue: null));
   }
 }
+mixin TestMixin on ComponentElement {
 
+}
+mixin TestMixin2 on ComponentElement {
+
+}
 /// An [Element] that uses a [ProxyWidget] as its configuration.
-abstract class ProxyElement extends ComponentElement {
+abstract class ProxyElement extends ComponentElement with TestMixin, TestMixin2 {
   /// Initializes fields for subclasses.
   ProxyElement(ProxyWidget widget) : super(widget);
 

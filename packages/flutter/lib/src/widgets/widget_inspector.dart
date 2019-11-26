@@ -2690,6 +2690,26 @@ const TextStyle _messageStyle = TextStyle(
   height: 1.2,
 );
 
+/// Mixin for Element to track
+///
+/// A [Dart Kernel Transformer](https://github.com/dart-lang/sdk/wiki/Kernel-Documentation).
+/// adds this interface to the [Widget] class when the
+/// `--track-widget-creation` flag is passed to `flutter_tool`. Dart 2.0 is
+/// required as injecting creation locations requires a
+/// [Dart Kernel Transformer](https://github.com/dart-lang/sdk/wiki/Kernel-Documentation).
+// ignore: unused_element
+mixin _HasUserCodeLocationElement on Element {
+
+  _Location _userCodeLocation;
+
+  @override
+  void mount(Element parent, dynamic newSlot) {
+    _userCodeLocation = const _Location(file: 'filea', line:0, column:0,name:'name');
+    super.mount(parent, newSlot);
+  }
+}
+
+
 /// Interface for classes that track the source code location the their
 /// constructor was called from.
 ///
