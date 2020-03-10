@@ -2,227 +2,144 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 
 import 'framework.dart';
 import 'navigator.dart';
 
-/// A widget that creates a [Router] and manages [Router] events.
-///
-/// This widget also updates the [RouterData] when a sub route name has changed.
-class RouterConfiguration extends StatefulWidget {
-  /// Creates a router configuration.
-  RouterConfiguration({Key key, this.pageKey, this.transitionDelegate, this.parser}): super(key: key);
-  final LocalKey pageKey;
-  /// the Routeable that owns this page.
-  final RouteNameParser parser;
-  final TransitionDelegate<dynamic> transitionDelegate;
-  @override
-  RouterConfigurationState createState() => RouterConfigurationState();
+class RouterData {
+
 }
 
-class RouterConfigurationState extends State<RouterConfiguration> {
-
-  void _onRouteNameUpdate(String routeName) {
-    final RouterData data = Router.routerDataOf(context);
-    data._childData = widget.parser.parse(routeName);
-    setState(() {/* the next build will grab the parsed result */});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final RouterData data = Router.routerDataOf(context)._childData;
-    assert(data != null);
-    return Router(key: widget.pageKey, data: data, transitionDelegate: widget.transitionDelegate, onRouteNameUpdate: _onRouteNameUpdate);
-  }
+/// Route name parser class that parse string route name into a data <T>
+abstract class RouteNameParser<T> {
+  /// Parse the route name into a data <T>.
+  T parse(String routeName);
 }
+
+/// An abstract class to provide an API for configuring and updating the
+/// [Navigator].
+abstract class RouterDelegate<T> {
+  /// creates a router delegate
+  const RouterDelegate();
+  /// A callback that will be called when [Router.backBottomDispatcher] wants to
+  /// pop the route.
+  void popRoute();
+
+  /// A method is called shortly after the Router has been built for the first
+  /// time with the initial route information obtained from the
+  /// [Router.routeNameProvider]. The route name will be parsed by
+  /// [Router.routeNameParser] before passing into this method.
+  ///
+  /// By default, this method directly called [setNewRoutePath].
+  void setInitialRoutePath(T routeData) {
+    setNewRoutePath(routeData);
+  }
+
+  /// A method is called when [Router.routeNameProvider] provides a new route
+  /// name, The route name will be parsed by [Router.routeNameParser] before
+  /// passing into this method.
+  ///
+  /// The [build] will be called shortly after this method was called, and it
+  /// should returns [Widget] with most up to date configuration.
+  void setNewRoutePath(T routeData);
+
+  /// A builder to builds the Widget contains a [Navigator].
+  ///
+  /// This build method will be called whenever [Router] asks for a new
+  /// [Navigator] to be built.
+  Widget build(BuildContext context);
+}
+
 /// A widget that takes [TransitionDelegate] and [RouterData] to build a
 /// [Navigator] with configuration.
-class Router extends InheritedWidget {
+class Router<T> extends StatefulWidget {
   /// Creates a router.
-  Router({Key key, this.data, this.onRouteNameUpdate, TransitionDelegate<dynamic> transitionDelegate}) :super(
-    key: key,
-    child: _Router(
-      data: data,
-      transitionDelegate: transitionDelegate,
-    ),
-  );
+  const Router({
+    Key key,
+    this.routeNameProvider,
+    this.routeNameParser,
+    this.routerDelegate,
+    this.backButtonDispatcher,
+  }) : super(key: key);
 
   /// Parsed router data.
-  final RouterData data;
+  final ValueListenable<String> routeNameProvider;
 
-  /// A callback that will be called when the router want to update the route
-  /// name.
-  final Function onRouteNameUpdate;
+  /// A parser that parse the route name into a data <T> for [routerDelegate].
+  final RouteNameParser<T> routeNameParser;
 
-  /// Gets the router data.
-  static RouterData routerDataOf(BuildContext context) {
-    assert(context != null);
-    final Router query = context.dependOnInheritedWidgetOfExactType<Router>();
-    if (query != null)
-      return query.data;
-    throw FlutterError.fromParts(<DiagnosticsNode>[
-      ErrorSummary('Router.of() called with a context that does not contain a Router.'),
-      ErrorDescription(
-        'No Router ancestor could be found starting from the context that was passed '
-          'to Router.of().'
-      ),
-      context.describeElement('The context used was')
-    ]);
+  /// A delegate to builds and configure the navigator.
+  final RouterDelegate<T> routerDelegate;
+
+  /// A [Listenable] that notifies the [Router] to pop the top most route.
+  final Listenable backButtonDispatcher;
+
+  @override
+  _RouterState<T> createState() => _RouterState<T>();
+}
+
+class _RouterState<T> extends State<Router<T>> {
+
+  @override
+  void initState() {
+    super.initState();
+    widget.routeNameProvider?.addListener(_onRouteNameUpdate);
+    widget.backButtonDispatcher.addListener(_onPopRoute);
+    _setNewRouteName(isInitialRoute: true);
   }
 
-  static void updateRouteNameOf(
-    BuildContext context, {
-    Key key,
-    @required String routeName
-  }) {
-    InheritedElement element = context.getElementForInheritedWidgetOfExactType<Router>();
-    if (key != null) {
-      while (element.widget.key != key) {
-        element = element.getElementForInheritedWidgetOfExactType<Router>();
-      }
+  void _onPopRoute() {
+    widget.routerDelegate.popRoute();
+    setState(() {
+      // widget.routerDelegate should have the latest route data. Pumps a frame
+      // to rebuild the navigator.
+    });
+  }
+
+  void _setNewRouteName({bool isInitialRoute = false}) {
+    final T routeData = widget.routeNameParser.parse(widget.routeNameProvider.value);
+    if (isInitialRoute) {
+      widget.routerDelegate.setInitialRoutePath(routeData);
+    } else {
+      widget.routerDelegate.setNewRoutePath(routeData);
     }
-    assert(element != null);
-    final Router router = element.widget as Router;
-    router.onRouteNameUpdate(routeName);
+  }
+
+  void _onRouteNameUpdate({bool isInitialRoute = false}){
+    _setNewRouteName();
+    setState(() {
+      // widget.routerDelegate should have the latest route data. Pumps a frame
+      // to rebuild the navigator.
+    });
   }
 
   @override
-  bool updateShouldNotify(Router oldWidget) => data != oldWidget.data;
-}
+  void didUpdateWidget(Router<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final bool providerHasChanged = oldWidget.routeNameProvider != widget.routeNameProvider;
+    if (providerHasChanged) {
+      oldWidget.routeNameProvider?.removeListener(_onRouteNameUpdate);
+      widget.routeNameProvider?.removeListener(_onRouteNameUpdate);
+    }
 
-/// Parsed route data.
-class RouterData {
-  /// Creates a parsed route data.
-  RouterData({this.pages, RouterData childData}): _childData = childData;
-  /// The pages list after parsed.
-  final List<Page<dynamic>> pages;
-  RouterData _childData;
-}
+    if (widget.backButtonDispatcher != oldWidget.backButtonDispatcher) {
+      oldWidget.backButtonDispatcher?.removeListener(_onPopRoute);
+      widget.backButtonDispatcher?.addListener(_onPopRoute);
+    }
 
-class _Router extends StatelessWidget {
-  const _Router({
-    this.data,
-    this.transitionDelegate,
-  }) : super();
-  final RouterData data;
-  final TransitionDelegate<dynamic> transitionDelegate;
+    if (
+      providerHasChanged ||
+      widget.routeNameParser != oldWidget.routeNameParser ||
+      widget.routerDelegate != oldWidget.routerDelegate
+    ) {
+      _setNewRouteName();
+    }
 
+  }
   @override
   Widget build(BuildContext context) {
-    return Navigator(
-      pages: data.pages,
-      onPopPage: (Route<dynamic> route, dynamic result) {
-        assert(route.settings == data.pages.last);
-        assert(
-        data._childData == null,
-        'Pop should only be triggered at the leaf router.'
-        );
-        data.pages.removeLast();
-        // TODO(chunhtai): we also need to notify route name has changed.
-        return route.didPop(result);
-      },
-      transitionDelegate: transitionDelegate,
-
-    );
+    return widget.routerDelegate.build(context);
   }
 }
 
-typedef RoutableWidgetBuilder<T> = Widget Function(Routable<T> routable, BuildContext context);
-typedef CustomPageBuilder = Page<dynamic> Function(String routeName);
-/// Routable
-abstract class Routable<T> extends Page<T> {
-  /// Creates a Routable widget.
-  const Routable({LocalKey key, this.transitionDelegate}) : super(key: key);
-
-  RouteNameParser get parser;
-  final TransitionDelegate<dynamic> transitionDelegate;
-  /// builds child routing content.
-  ///
-  /// It creates a Router which uses [RouteData] parsed from [parser].
-  Widget buildChildRoutingContent(BuildContext context) {
-    return RouterConfiguration(pageKey: key, parser: parser, transitionDelegate: transitionDelegate);
-  }
-}
-
-
-/// A route Name parser that is responsible for parsing route names into
-/// [RouterData]s.
-abstract class RouteNameParser {
-  /// Initializes a route name parser.
-  const RouteNameParser();
-  /// Parses a given route name into a [RouterData].
-  RouterData parse(String routeName);
-
-  /// Restores the route name from list of pages.
-  String restoreRouteName(RouterData data);
-}
-
-/// A web version of [RouteNameParser].
-///
-/// This method uses an input map to find the matches for a given route name.
-class WebRouteNameParser extends RouteNameParser{
-  /// Creates a web route name parser with input map.
-  WebRouteNameParser({this.map, this.onUnknownRouteName});
-
-  /// A pattern map to match a route name into a page builder.
-  final Map<String, CustomPageBuilder> map;
-
-  /// A fallback builder if the route name can not be parsed. The [Page] return
-  /// from this parser must
-  final CustomPageBuilder onUnknownRouteName;
-
-  RouterData _lastProducedRouterData;
-  String _lastRouteNamePiece;
-
-  @override
-  String restoreRouteName(RouterData data) {
-    assert(data == _lastProducedRouterData);
-    assert(_lastProducedRouterData.pages.length == 1);
-    final Page<dynamic> lastPage = data.pages.last;
-    String result = _lastRouteNamePiece;
-    if (lastPage is Routable) {
-      result += lastPage.parser.restoreRouteName(data._childData);
-    }
-    return result;
-  }
-
-  RouterData _getRouterDataForUnknownRoute(String routeName) {
-    if (onUnknownRouteName == null) {
-      return null;
-    }
-    final Page<dynamic> page = onUnknownRouteName(routeName);
-    assert(page is! Routable);
-    return RouterData(pages: <Page<dynamic>>[page]);
-  }
-
-  @override
-  RouterData parse(String routeName) {
-    // TODO: do a regex matching instead of direct matching.
-    final String matchedPattern = map.keys.firstWhere(
-      (String pattern) => routeName.startsWith(pattern),
-      orElse: () => null,
-    );
-
-    if (matchedPattern == null) {
-      return _getRouterDataForUnknownRoute(routeName);
-    }
-
-    final Page<dynamic> page = map[matchedPattern](matchedPattern);
-
-    final RouterData result = RouterData(pages: <Page<dynamic>>[page]);
-
-    if (page is Routable) {
-      result._childData = page.parser.parse(routeName.replaceAll(matchedPattern, ''));
-      if (result._childData == null) {
-        // There is a parsing error that the sub parsers cannot resolve. This
-        // should fallback to onUnknownRouteName in this parser.
-        return _getRouterDataForUnknownRoute(routeName);
-      }
-    }
-    // The entire route name is parsed successfully.
-    _lastRouteNamePiece = matchedPattern;
-    _lastProducedRouterData = result;
-    return result;
-  }
-}

@@ -20,6 +20,7 @@ import 'media_query.dart';
 import 'navigator.dart';
 import 'pages.dart';
 import 'performance_overlay.dart';
+import 'router.dart';
 import 'scrollable.dart';
 import 'semantics_debugger.dart';
 import 'shortcuts.dart';
@@ -277,6 +278,8 @@ class WidgetsApp extends StatefulWidget {
   /// null, [navigatorKey] must also be null.
   /// {@endtemplate}
   final GlobalKey<NavigatorState> navigatorKey;
+
+  final RouteNameParser<RouterData> routeNameParser;
 
   /// {@template flutter.widgets.widgetsApp.onGenerateRoute}
   /// The route generator callback used when the app is navigated to a
