@@ -259,7 +259,104 @@ class WidgetsApp extends StatefulWidget {
        assert(showSemanticsDebugger != null),
        assert(debugShowCheckedModeBanner != null),
        assert(debugShowWidgetInspector != null),
+       routeNameParser = null,
+       routerDelegate = null,
        super(key: key);
+
+  /// A WidgetApp initializes with [Router].
+  WidgetsApp.router({
+    Key key,
+    @required this.routeNameParser,
+    @required this.routerDelegate,
+    @required this.onUnknownRouteName,
+    this.navigatorObservers = const <NavigatorObserver>[],
+    this.initialRoute,
+    this.builder,
+    this.title = '',
+    this.onGenerateTitle,
+    this.textStyle,
+    @required this.color,
+    this.locale,
+    this.localizationsDelegates,
+    this.localeListResolutionCallback,
+    this.localeResolutionCallback,
+    this.supportedLocales = const <Locale>[Locale('en', 'US')],
+    this.showPerformanceOverlay = false,
+    this.checkerboardRasterCacheImages = false,
+    this.checkerboardOffscreenLayers = false,
+    this.showSemanticsDebugger = false,
+    this.debugShowWidgetInspector = false,
+    this.debugShowCheckedModeBanner = true,
+    this.inspectorSelectButtonBuilder,
+    this.shortcuts,
+    this.actions,
+  }) : assert(navigatorObservers != null),
+      assert(routes != null),
+      assert(
+      home == null ||
+        onGenerateInitialRoutes == null,
+      'If onGenerateInitialRoutes is specifiied, the home argument will be '
+        'redundant.'
+      ),
+      assert(
+      home == null ||
+        !routes.containsKey(Navigator.defaultRouteName),
+      'If the home property is specified, the routes table '
+        'cannot include an entry for "/", since it would be redundant.'
+      ),
+      assert(
+      builder != null ||
+        home != null ||
+        routes.containsKey(Navigator.defaultRouteName) ||
+        onGenerateRoute != null ||
+        onUnknownRoute != null,
+      'Either the home property must be specified, '
+        'or the routes table must include an entry for "/", '
+        'or there must be on onGenerateRoute callback specified, '
+        'or there must be an onUnknownRoute callback specified, '
+        'or the builder property must be specified, '
+        'because otherwise there is nothing to fall back on if the '
+        'app is started with an intent that specifies an unknown route.'
+      ),
+      assert(
+      (home != null ||
+        routes.isNotEmpty ||
+        onGenerateRoute != null ||
+        onUnknownRoute != null)
+        ||
+        (builder != null &&
+          navigatorKey == null &&
+          initialRoute == null &&
+          navigatorObservers.isEmpty),
+      'If no route is provided using '
+        'home, routes, onGenerateRoute, or onUnknownRoute, '
+        'a non-null callback for the builder property must be provided, '
+        'and the other navigator-related properties, '
+        'navigatorKey, initialRoute, and navigatorObservers, '
+        'must have their initial values '
+        '(null, null, and the empty list, respectively).'
+      ),
+      assert(
+       routeNameParser != null && routerDelegate != null,
+       'both routeNameParser '
+      ),
+      assert(title != null),
+      assert(color != null),
+      assert(supportedLocales != null && supportedLocales.isNotEmpty),
+      assert(showPerformanceOverlay != null),
+      assert(checkerboardRasterCacheImages != null),
+      assert(checkerboardOffscreenLayers != null),
+      assert(showSemanticsDebugger != null),
+      assert(debugShowCheckedModeBanner != null),
+      assert(debugShowWidgetInspector != null),
+      navigatorKey = null,
+      onGenerateRoute = null,
+      pageRouteBuilder = null,
+      home = null,
+      onGenerateInitialRoutes = null,
+      onUnknownRoute = null,
+      routes = null,
+      super(key: key);
 
   /// {@template flutter.widgets.widgetsApp.navigatorKey}
   /// A key to use when building the [Navigator].
@@ -279,7 +376,16 @@ class WidgetsApp extends StatefulWidget {
   /// {@endtemplate}
   final GlobalKey<NavigatorState> navigatorKey;
 
+  /// A parser to parse the route name into a generic data type for configuring
+  /// tne [routerDelegate].
   final RouteNameParser<RouterData> routeNameParser;
+
+  /// A delegate that configures a [Navigator] that will be used by the [Router].
+  final RouterDelegate<RouterData> routerDelegate;
+
+  /// A builder that builds a widget to replace the [Navigator] when input route
+  /// name is invalid
+  final WidgetBuilder onUnknownRouteName;
 
   /// {@template flutter.widgets.widgetsApp.onGenerateRoute}
   /// The route generator callback used when the app is navigated to a
@@ -949,10 +1055,25 @@ class WidgetsApp extends StatefulWidget {
 class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
   // STATE LIFECYCLE
 
+  bool get _usesRouter => widget.routerDelegate != null;
+
+  // If window.defaultRouteName isn't '/', we should assume it was set
+  // intentionally via `setInitialRoute`, and should override whatever is in
+  // [widget.initialRoute].
+  String get _initialRouteName => WidgetsBinding.instance.window.defaultRouteName != Navigator.defaultRouteName
+    ? WidgetsBinding.instance.window.defaultRouteName
+    : widget.initialRoute ?? WidgetsBinding.instance.window.defaultRouteName;
+
+  ValueNotifier<String> _routeNameProvider;
+
+  final _Notifier _backButtonDispatcher = _Notifier();
+
   @override
   void initState() {
     super.initState();
-    _updateNavigator();
+    _routeNameProvider = ValueNotifier<String>(_initialRouteName);
+    if (!_usesRouter)
+      _updateNavigator();
     _locale = _resolveLocales(WidgetsBinding.instance.window.locales, widget.supportedLocales);
     WidgetsBinding.instance.addObserver(this);
   }
@@ -960,7 +1081,8 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(WidgetsApp oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.navigatorKey != oldWidget.navigatorKey)
+    _routeNameProvider = ValueNotifier<String>(_initialRouteName);
+    if (!_usesRouter && widget.navigatorKey != oldWidget.navigatorKey)
       _updateNavigator();
   }
 
@@ -1278,16 +1400,19 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    Widget navigator;
-    if (_navigator != null) {
-      navigator = Navigator(
+    Widget routing;
+    if (_usesRouter) {
+      routing = Router<RouterData>(
+        routeNameProvider: _routeNameProvider,
+        routeNameParser: widget.routeNameParser,
+        routerDelegate: widget.routerDelegate,
+        backButtonDispatcher: _backButtonDispatcher,
+      );
+    } else {
+      assert(_navigator != null);
+      routing = Navigator(
         key: _navigator,
-        // If window.defaultRouteName isn't '/', we should assume it was set
-        // intentionally via `setInitialRoute`, and should override whatever
-        // is in [widget.initialRoute].
-        initialRoute: WidgetsBinding.instance.window.defaultRouteName != Navigator.defaultRouteName
-            ? WidgetsBinding.instance.window.defaultRouteName
-            : widget.initialRoute ?? WidgetsBinding.instance.window.defaultRouteName,
+        initialRoute: _initialRouteName,
         onGenerateRoute: _onGenerateRoute,
         onGenerateInitialRoutes: widget.onGenerateInitialRoutes == null
           ? Navigator.defaultGenerateInitialRoutes
@@ -1303,12 +1428,12 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
     if (widget.builder != null) {
       result = Builder(
         builder: (BuildContext context) {
-          return widget.builder(context, navigator);
+          return widget.builder(context, routing);
         },
       );
     } else {
-      assert(navigator != null);
-      result = navigator;
+      assert(routing != null);
+      result = routing;
     }
 
     if (widget.textStyle != null) {
@@ -1408,6 +1533,12 @@ class _WidgetsAppState extends State<WidgetsApp> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+}
+
+class _Notifier extends ChangeNotifier {
+  void notify() {
+    notifyListeners();
   }
 }
 
