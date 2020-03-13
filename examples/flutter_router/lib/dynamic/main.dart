@@ -17,16 +17,27 @@ void main(){
           key: const ValueKey<String>('root'),
           routing: <Pattern, Result>{
             'profile': createProfileParseDefinition('some_profile_flag'),
+            'user/:id': createProfileParseDefinition('some_user_flag'),
             'dashbaord': Result('some_dashbaord_flag'), // Matches '/dashbaord'
           }, // Matches '/'
         )
       ),
 
+      // /dashboard -> {'root': 'some_dashbaord_flag'}
+      // /profile/privacy -> {'root': 'some_profile_flag', 'profile': 'some_privacy_flag'}
+      // /user/privacy -> {'root': 'some_user_flag', 'profile': 'some_privacy_flag'}
+
 
       routerDelegate: DynamicRouterDelegate(
         builder: (BuildContext context) {
           return Scaffold(
-            appBar: AppBar(title: const Text('main page')),
+            appBar: AppBar(title: Routable(
+              parserKey: const ValueKey<String>('profile'),
+              builder: (BuildContext context, dynamic flag) {
+              if (flag == 'some_setting_flag')
+              return LogOutbutton();
+            }
+          )),
             body: Routable(
               parserKey: const ValueKey<String>('root'),
               builder: (BuildContext context, dynamic flag) {
@@ -53,16 +64,9 @@ class DashBoard extends Placeholder{}
 class LogOutbutton extends Placeholder{}
 
 
+// think about exposing global route data, but be careful
 
+// widgets with nested navigator and audit.
 
-
-
-
-
-//            appBar: AppBar(title: Routable(
-//              parserKey: const ValueKey<String>('profile'),
-//              builder: (BuildContext context, dynamic flag) {
-//                if (flag == 'some_setting_flag')
-//                  return LogOutbutton();
-//              }
-//            )),
+// adv use case:
+//        1: route validation involving database call.

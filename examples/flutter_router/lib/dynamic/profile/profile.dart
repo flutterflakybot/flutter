@@ -28,10 +28,10 @@ class ProfileContent extends StatelessWidget {
       Routable(
         parserKey: const ValueKey<String>('profile'),
         builder: (BuildContext context, dynamic flag) {
-          if (flag == 'setting') {
+          if (flag == 'some_setting_flag') {
             return const Text('setting');
           }
-          if (flag == 'privacy') {
+          if (flag == 'some_privacy_flag') {
             return const Text('privacy');
           }
           throw Error();
