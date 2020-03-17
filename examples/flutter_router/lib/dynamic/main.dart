@@ -12,20 +12,28 @@ void main(){
       initialRoute: '/profile/privacy',
 
 
-      routeNameParser: DynamicRouteNameParser(
-        parserDefinition: DynamicParserDefinition(
+      routeNameParser: FlutterRouteNameParser(
+        parserDefinition: ParserDefinition<String>(
           key: const ValueKey<String>('root'),
-          routing: <Pattern, Result>{
-            'profile': createProfileParseDefinition('some_profile_flag'),
-            'user/:id': createProfileParseDefinition('some_user_flag'),
-            'dashbaord': Result('some_dashbaord_flag'), // Matches '/dashbaord'
-          }, // Matches '/'
+          routing: <Pattern, ParsedResult<String>>{
+            'profile': ParserDefinition<String>(
+              key: const ValueKey<String>('profile'),
+              result: 'some_profile_flag',
+              routing: <Pattern, ParsedResult<String>>{
+                'setting': ParsedResult<String>('some_setting_flag'), //  Matches '/profile/setting'
+                'privacy': ParsedResult<String>('some_privacy_flag'), //  Matches '/profile/privacy'
+              },
+            ),
+            'dashbaord': ParsedResult<String>('some_dashbaord_flag'), // Matches '/dashbaord'
+          },
+          result: 'some_home_flag'// Matches '/'
         )
       ),
 
+      // / -> {'root': 'some_home_flag'}
       // /dashboard -> {'root': 'some_dashbaord_flag'}
       // /profile/privacy -> {'root': 'some_profile_flag', 'profile': 'some_privacy_flag'}
-      // /user/privacy -> {'root': 'some_user_flag', 'profile': 'some_privacy_flag'}
+      // /profile/setting -> {'root': 'some_user_flag', 'profile': 'some_setting_flag'}
 
 
       routerDelegate: DynamicRouterDelegate(

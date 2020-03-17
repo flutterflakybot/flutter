@@ -6,13 +6,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
 
 
-DynamicParserDefinition createProfileParseDefinition(dynamic result) {
-  return DynamicParserDefinition(
+ParserDefinition<String> createProfileParseDefinition(String result) {
+  return ParserDefinition<String>(
     key: const ValueKey<String>('profile'),
     result: result,
-    routing: <Pattern, Result>{
-      'setting': Result('some_setting_flag'), //  Matches '/profile/setting'
-      'privacy': Result('some_privacy_flag'), //  Matches '/profile/privacy'
+    routing: <Pattern, ParsedResult<String>>{
+      'setting': ParsedResult<String>('some_setting_flag'), //  Matches '/profile/setting'
+      'privacy': ParsedResult<String>('some_privacy_flag'), //  Matches '/profile/privacy'
     },
   );
 }
