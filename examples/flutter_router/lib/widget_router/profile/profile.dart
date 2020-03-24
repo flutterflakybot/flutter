@@ -25,7 +25,7 @@ class ProfileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(children: <Widget>[
       const Text('this is profile'),
-      Routable(
+      RouteFragmentBuilder(
         parserKey: const ValueKey<String>('profile'),
         builder: (BuildContext context, dynamic flag) {
           if (flag == 'some_setting_flag') {

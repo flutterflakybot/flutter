@@ -11,7 +11,10 @@ import 'framework.dart';
 import 'navigator.dart';
 
 typedef CustomPageBuilder = Page<dynamic> Function();
-typedef RoutableBuilder = Widget Function(BuildContext, dynamic);
+typedef FragmentBuilder = Widget Function(BuildContext, dynamic);
+typedef UnknownRouteBuilder<T> = Route<T> Function(BuildContext, RouteSettings, String);
+typedef UnknownWidgetBuilder = Widget Function(BuildContext, String);
+
 /// An abstract class for parsed Router data that will be used in [WidgetApp]
 abstract class RouterData {
   /// A getter that is used by [WidgetApp] to get the latest route name.
@@ -25,6 +28,17 @@ abstract class RouterData {
 abstract class RouteNameParser<T> {
   /// Parse the route name into a data <T>.
   T parse(String routeName);
+
+  /// Retrieves the route name parser that matches type R.
+  static R of<R extends RouteNameParser<dynamic>>(BuildContext context) {
+    State<Router<dynamic>> walker = Router.of(context);
+
+    while(walker.widget.routeNameParser is! R) {
+      walker = Router.of(walker.context);
+    }
+
+    return walker.widget.routeNameParser as R;
+  }
 }
 
 /// An abstract class to provide an API for configuring and updating the
@@ -53,6 +67,8 @@ abstract class RouterDelegate<T> {
   /// The [build] will be called shortly after this method was called, and it
   /// should returns [Widget] with most up to date configuration.
   void setNewRoutePath(T routeData);
+
+  void onUnknownRouteName(BuildContext context, String routeName);
 
   /// A builder to builds the Widget contains a [Navigator].
   ///
@@ -84,6 +100,11 @@ class Router<T> extends StatefulWidget {
 
   /// A [Listenable] that notifies the [Router] to pop the top most route.
   final Listenable backButtonDispatcher;
+
+  /// Find immediately [Router] ancestor of the context.
+  static State<Router<dynamic>> of(BuildContext context) {
+    return context.findAncestorStateOfType<_RouterState<dynamic>>();
+  }
 
   @override
   _RouterState<T> createState() => _RouterState<T>();
@@ -174,7 +195,9 @@ class ParserDefinition<T> extends ParsedResult<T>{
   /// Use [page] to provide a default page when there is no more sub route.
   ParserDefinition({this.key, this.routing, T result}): super(result);
 
+  /// The key corresponds to this parser.
   final LocalKey key;
+
   /// The routing table
   final Map<Pattern, ParsedResult<dynamic>> routing;
 
@@ -213,8 +236,8 @@ class ParserDefinition<T> extends ParsedResult<T>{
   }
 }
 
-class _FlutterRouteData extends RouterData {
-  _FlutterRouteData({
+class _ParsedRouteData extends RouterData {
+  _ParsedRouteData({
     this.maps,
   });
 
@@ -226,9 +249,9 @@ class _FlutterRouteData extends RouterData {
   final List<Map<LocalKey, dynamic>> maps;
 }
 /// flutter route name parser
-class FlutterRouteNameParser extends RouteNameParser<_FlutterRouteData> {
+class MobileRouteNameParser extends RouteNameParser<_ParsedRouteData> {
   /// Creates a dynamic parser.
-  FlutterRouteNameParser({
+  MobileRouteNameParser({
     this.parserDefinition,
     this.enableRouteStack,
   }) : super();
@@ -243,7 +266,7 @@ class FlutterRouteNameParser extends RouteNameParser<_FlutterRouteData> {
   final bool enableRouteStack;
 
   @override
-  _FlutterRouteData parse(String routeName) {
+  _ParsedRouteData parse(String routeName) {
     assert(routeName != null);
     List<Map<LocalKey, dynamic>> result;
     if (enableRouteStack) {
@@ -260,24 +283,25 @@ class FlutterRouteNameParser extends RouteNameParser<_FlutterRouteData> {
     } else {
       result.add(parserDefinition._parse(routeName));
     }
-    return _FlutterRouteData(maps: result);
+    return _ParsedRouteData(maps: result);
   }
 }
 
 
 /// A default router delegate that configures the navigator based on the parsed
-/// result from the [FlutterRouteNameParser].
+/// result from the [MobileRouteNameParser].
 ///
 /// See also:
 ///
-///  * [FlutterRouteNameParser], which parses the route name for this delegate
-class DynamicRouterDelegate extends RouterDelegate<_FlutterRouteData> {
+///  * [MobileRouteNameParser], which parses the route name for this delegate
+class WidgetsRouterDelegate extends RouterDelegate<_ParsedRouteData> {
   /// Creates a default route delegate.
-  DynamicRouterDelegate({this.transitionDelegate = const DefaultTransitionDelegate<dynamic>(), this.builder});
+  WidgetsRouterDelegate({this.transitionDelegate = const DefaultTransitionDelegate<dynamic>(), this.builder, this.onUnknownRoute});
 
-  _FlutterRouteData _routerData;
+  _ParsedRouteData _routerData;
 
-  final WidgetBuilder builder;
+  final RouteBuilder<dynamic> builder;
+  final UnknownRouteBuilder<dynamic> onUnknownRoute;
 
   /// The transition delegate that will be used in the configured [Navigator].
   TransitionDelegate<dynamic> transitionDelegate;
@@ -289,29 +313,44 @@ class DynamicRouterDelegate extends RouterDelegate<_FlutterRouteData> {
   }
 
   @override
-  void setNewRoutePath(_FlutterRouteData routeData) {
+  void setNewRoutePath(_ParsedRouteData routeData) {
     _routerData = routeData;
   }
 
   @override
   Widget build(BuildContext context) {
     Navigator(
-      pages: const <Page<dynamic>>[],
+      pages: <Page<dynamic>>[
+        PageBuilder<dynamic>(
+          key: UniqueKey(),
+          routeBuilder: builder,
+        )
+      ],
       transitionDelegate: transitionDelegate,
     );
   }
+  @override
+  Route<dynamic> onUnknownRouteName(BuildContext context, String routeName) {
+    return onUnknownRoute(context, null, routeName);
+  }
 }
 
-/// A Routable Widget that takes a builder and parser key to build the widget.
-class Routable extends StatelessWidget {
+class MaterialRouterDelegate extends RouterDelegate<_ParsedRouteData> {
+  MaterialRouterDelegate({this.onUnknownRoute});
+
+  UnknownWidgetBuilder onUnknownRoute;
+}
+
+/// A RouteFragmentBuilder Widget that takes a builder and parser key to build the widget.
+class RouteFragmentBuilder extends StatelessWidget {
   /// Creates a builder widget.
-  Routable({Key key, this.parserKey, this.builder}): super(key: key);
+  RouteFragmentBuilder({Key key, this.parserKey, this.builder}): super(key: key);
 
   /// the key to the corresponding builder.
   final LocalKey parserKey;
 
   /// A builder to build a widget for the corresponding routing data.
-  final RoutableBuilder builder;
+  final FragmentBuilder builder;
   @override
   Widget build(BuildContext context) {
     // TODO(chunhtai): implement this.
