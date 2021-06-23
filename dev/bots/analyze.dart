@@ -57,6 +57,9 @@ Future<void> run(List<String> arguments) async {
   print('$clock Deprecations...');
   await verifyDeprecations(flutterRoot);
 
+  print('$clock TODOs...');
+  await verifyTODOs(flutterRoot);
+
   print('$clock Licenses...');
   await verifyNoMissingLicense(flutterRoot);
 
@@ -215,6 +218,41 @@ Future<void> verifyDeprecations(String workingDirectory, { int minimumMatches = 
           throw 'Unexpected deprecation notice indent.';
       } catch (error) {
         errors.add('${file.path}:${lineNumber + 1}: $error');
+      }
+    }
+  }
+  // Fail if any errors
+  if (errors.isNotEmpty) {
+    exitWithError(<String>[
+      ...errors,
+      '${bold}See: https://github.com/flutter/flutter/wiki/Tree-hygiene#handling-breaking-changes$reset',
+    ]);
+  }
+}
+
+final RegExp _findTODOPattern = RegExp(r'TODO:|TODO\((?<ldap>.+)\):');
+final String _currentFileName = 'dev/bots/analyze.dart';
+
+Future<void> verifyTODOs(String workingDirectory, { int minimumMatches = 2000 }) async {
+  print('verify TODO working directory $workingDirectory');
+  final List<String> errors = <String>[];
+  await for (final File file in _allFiles(workingDirectory, 'dart', minimumMatches: minimumMatches)) {
+    if (file.path.endsWith(_currentFileName)) {
+      continue;
+    }
+    int lineNumber = 0;
+    final List<String> lines = file.readAsLinesSync();
+    final List<int> linesWithDeprecations = <int>[];
+    for (final String line in lines) {
+      if (line.contains(_findTODOPattern)) {
+        linesWithDeprecations.add(lineNumber);
+      }
+      lineNumber += 1;
+    }
+    for (final int lineNumber in linesWithDeprecations) {
+      final RegExpMatch match1 = _findTODOPattern.firstMatch(lines[lineNumber]);
+      if (match1.namedGroup('ldap') == null) {
+        print('the $lineNumber in ${file.path} todo in ${lines[lineNumber]}');
       }
     }
   }
