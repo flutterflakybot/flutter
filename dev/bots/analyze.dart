@@ -230,29 +230,58 @@ Future<void> verifyDeprecations(String workingDirectory, { int minimumMatches = 
   }
 }
 
-final RegExp _findTODOPattern = RegExp(r'TODO:|TODO\((?<ldap>.+)\):');
-final String _currentFileName = 'dev/bots/analyze.dart';
+final RegExp _findTODOPattern = RegExp(r'// *TODO:|TODO\((?<ldap>.+)\):');
+final RegExp _findGitHubIssueLink = RegExp(r'https://github\.com/flutter/flutter/issues/[0-9]+');
+final RegExp _commentPattern = RegExp(r'^ *\/\/');
+const String _currentFileName = 'dev/bots/analyze.dart';
+
+const List<String> _todoEnforceSubDirectories = <String>['dev'];
 
 Future<void> verifyTODOs(String workingDirectory, { int minimumMatches = 2000 }) async {
   print('verify TODO working directory $workingDirectory');
   final List<String> errors = <String>[];
-  await for (final File file in _allFiles(workingDirectory, 'dart', minimumMatches: minimumMatches)) {
-    if (file.path.endsWith(_currentFileName)) {
-      continue;
-    }
-    int lineNumber = 0;
-    final List<String> lines = file.readAsLinesSync();
-    final List<int> linesWithDeprecations = <int>[];
-    for (final String line in lines) {
-      if (line.contains(_findTODOPattern)) {
-        linesWithDeprecations.add(lineNumber);
+  for (final String subDirectory in _todoEnforceSubDirectories) {
+    final String fullPath = path.join(workingDirectory, subDirectory);
+    await for (final File file in _allFiles(fullPath, 'dart', minimumMatches: 0)) {
+      if (file.path.endsWith(_currentFileName)) {
+        continue;
       }
-      lineNumber += 1;
-    }
-    for (final int lineNumber in linesWithDeprecations) {
-      final RegExpMatch match1 = _findTODOPattern.firstMatch(lines[lineNumber]);
-      if (match1.namedGroup('ldap') == null) {
-        print('the $lineNumber in ${file.path} todo in ${lines[lineNumber]}');
+      int lineNumber = 0;
+      final List<String> lines = file.readAsLinesSync();
+      final List<int> linesWithDeprecations = <int>[];
+      for (final String line in lines) {
+        if (line.contains(_findTODOPattern)) {
+          linesWithDeprecations.add(lineNumber);
+        }
+        lineNumber += 1;
+      }
+      for (int lineNumber in linesWithDeprecations) {
+        try {
+          final RegExpMatch match1 = _findTODOPattern.firstMatch(
+              lines[lineNumber]);
+          if (match1.namedGroup('ldap') == null) {
+            throw 'No assignee for TODO.';
+          }
+          bool hasIssueLink = false;
+          // Makes sure the continuous comment blocks has an issue number.
+          do {
+            if (_findGitHubIssueLink.hasMatch(lines[lineNumber])) {
+              hasIssueLink = true;
+              break;
+            }
+            lineNumber += 1;
+          } while (lineNumber < lines.length &&
+              _commentPattern.hasMatch(lines[lineNumber]) &&
+              lines[lineNumber]
+                  .replaceFirst(_commentPattern, '')
+                  .trim()
+                  .isNotEmpty);
+          if (!hasIssueLink) {
+            throw 'No github issue link for TODO.';
+          }
+        } catch (error) {
+          errors.add('${file.path}:${lineNumber + 1}: $error');
+        }
       }
     }
   }
@@ -260,7 +289,7 @@ Future<void> verifyTODOs(String workingDirectory, { int minimumMatches = 2000 })
   if (errors.isNotEmpty) {
     exitWithError(<String>[
       ...errors,
-      '${bold}See: https://github.com/flutter/flutter/wiki/Tree-hygiene#handling-breaking-changes$reset',
+      '${bold}See: https://dart-lang.github.io/linter/lints/flutter_style_todos.html',
     ]);
   }
 }
