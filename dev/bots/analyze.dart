@@ -277,21 +277,38 @@ Future<void> verifyTODOs(String workingDirectory, { int minimumMatches = 2000 })
                   .trim()
                   .isNotEmpty);
           if (!hasIssueLink) {
-            throw 'No github issue link for TODO.';
+            throw match1.namedGroup('ldap');
           }
         } catch (error) {
-          errors.add('${file.path}:${lineNumber + 1}: $error');
+          errors.add('${file.path}:${lineNumber + 1}, $error');
         }
       }
     }
   }
-  // Fail if any errors
-  if (errors.isNotEmpty) {
-    exitWithError(<String>[
-      ...errors,
-      '${bold}See: https://dart-lang.github.io/linter/lints/flutter_style_todos.html',
-    ]);
+  final Map<String, List<String>> nameToURL = <String, List<String>>{};
+  for (final String error in errors) {
+    var iter = error.split(', ');
+    var iter2 = iter[0].split(':');
+    String filename = iter2[0].replaceFirst('/Users/chtai/git/flutter', 'https://github.com/flutter/flutter/blob/master/') + '#L' + iter2[1];
+    if (!nameToURL.containsKey(iter[1])) {
+      nameToURL[iter[1]] = <String>[];
+    }
+    nameToURL[iter[1]].add(filename);
   }
+  for (String name in nameToURL.keys) {
+    print('@$name:');
+    for (String file in nameToURL[name]) {
+      print('  $file');
+    }
+    print('\n\n');
+  }
+  // Fail if any errors
+  // if (errors.isNotEmpty) {
+  //   exitWithError(<String>[
+  //     ...errors,
+  //     '${bold}See: https://dart-lang.github.io/linter/lints/flutter_style_todos.html',
+  //   ]);
+  // }
 }
 
 String _generateLicense(String prefix) {
