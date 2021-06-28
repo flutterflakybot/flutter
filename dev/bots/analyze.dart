@@ -231,7 +231,7 @@ Future<void> verifyDeprecations(String workingDirectory, { int minimumMatches = 
 }
 
 final RegExp _findTODOPattern = RegExp(r'// *TODO:|TODO\((?<ldap>.+)\):');
-final RegExp _findGitHubIssueLink = RegExp(r'https://github\.com/flutter/flutter/issues/[0-9]+');
+final RegExp _findGitHubIssueLink = RegExp(r'https://github\.com/[^ \n]+/issues/[0-9]+');
 final RegExp _commentPattern = RegExp(r'^ *\/\/');
 const String _currentFileName = 'dev/bots/analyze.dart';
 
@@ -263,16 +263,17 @@ Future<void> verifyTODOs(String workingDirectory, { int minimumMatches = 2000 })
             throw 'No assignee for TODO.';
           }
           bool hasIssueLink = false;
+          int walker = lineNumber;
           // Makes sure the continuous comment blocks has an issue number.
           do {
-            if (_findGitHubIssueLink.hasMatch(lines[lineNumber])) {
+            if (_findGitHubIssueLink.hasMatch(lines[walker])) {
               hasIssueLink = true;
               break;
             }
-            lineNumber += 1;
-          } while (lineNumber < lines.length &&
+            walker += 1;
+          } while (walker < lines.length &&
               _commentPattern.hasMatch(lines[lineNumber]) &&
-              lines[lineNumber]
+              lines[walker]
                   .replaceFirst(_commentPattern, '')
                   .trim()
                   .isNotEmpty);
