@@ -1823,7 +1823,6 @@ targets:
 
   - name: Mac_ios flutter_gallery__transition_perf_e2e_ios32
     builder: Mac_ios flutter_gallery__transition_perf_e2e_ios32
-    bringup: true
     presubmit: false
     properties:
       tags: >
